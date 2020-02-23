@@ -2,13 +2,10 @@ import csv
 import pickle
 import re
 import string
-from collections import OrderedDict
 
-import matplotlib.pyplot as plt
 import nltk
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import sklearn
 from keras.layers import Dense, LSTM, Dropout
 from keras.layers.embeddings import Embedding
@@ -17,11 +14,9 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
 from keras.wrappers.scikit_learn import KerasClassifier
 from lime.lime_text import LimeTextExplainer
-from nltk.corpus import stopwords
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import make_pipeline
 
 
 class TextsToSequences(Tokenizer, BaseEstimator, TransformerMixin):
@@ -58,7 +53,6 @@ padder = Padder(140)
 
 
 def cleanText(var):
-
     # replace punctuation with spaces
     var = re.sub('[{}]'.format(string.punctuation), " ", var)
     # remove double spaces
@@ -81,6 +75,69 @@ def preProcessing(pX):
     for t in pX:
         clean_tweet_texts.append(cleanText(t))
     return clean_tweet_texts
+
+
+
+def create_model():
+    model = Sequential()
+    model.add(Embedding(20000, 64, input_length=140, trainable=True))
+    model.add(Dropout(0.25))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dense(512, activation='relu'))
+    model.add(Dense(128, activation='relu'))
+    model.add(LSTM(100))
+    model.add(Dense(512, activation='relu'))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dense(32, activation='relu'))
+    model.add(Dense(1, activation='sigmoid'))
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    print(model.summary())
+    return model
+
+
+def calculate_fidelity():
+    # Creating an explainer object. We pass the class_names as an argument for prettier display.
+    explainer = LimeTextExplainer(class_names=class_names)
+
+    ids = list()
+    fidelities = list()
+
+    for i, e in enumerate(X_test):
+        print(str(i + 1) + '.', e)
+
+    for i in range(len(X_test)):
+
+        print('index: ', i)
+        # Generate an explanation with at most n features for a random document in the test set.
+        idx = i
+        exp = explainer.explain_instance(X_test[idx], loaded_model.predict_proba, num_features=10)
+        label = pred[i]
+        label = label//2
+
+        bb_probs = explainer.Zl[:, label]
+        print('bb_probs: ', bb_probs)
+        lr_probs = explainer.lr.predict(explainer.Zlr)
+        print('lr_probs: ', lr_probs)
+        fidelity = 1 - np.sum(np.abs(bb_probs - lr_probs) < 0.01) / len(bb_probs)
+        print('fidelity: ', fidelity)
+        print('np.sum: ', np.sum(np.abs(bb_probs - lr_probs) < 0.01))
+        ids.append(i)
+        fidelities.append(fidelity)
+        print('')
+
+    fidelity_average = 0
+
+    for i in range(len(ids)):
+        print(ids[i])
+        print(fidelities[i])
+        fidelity_average += fidelities[i]
+
+    print("fidelity average is: ", fidelity_average/len(ids))
+
+    with open('output/LIME_hs_DNN.csv', mode='w', newline='') as file:
+        writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        for i in range(len(ids)):
+            writer.writerow([ids[i], 'hate speech', 'DNN', fidelities[i]])
 
 
 df = pd.read_csv("data/hate_tweets.csv", encoding='utf-8')
@@ -113,23 +170,6 @@ train_vectors = vectorizer.fit_transform(X_train)
 test_vectors = vectorizer.transform(X_test)
 
 
-def create_model():
-    model = Sequential()
-    model.add(Embedding(20000, 64, input_length=140, trainable=True))
-    model.add(Dropout(0.25))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dense(512, activation='relu'))
-    model.add(Dense(128, activation='relu'))
-    model.add(LSTM(100))
-    model.add(Dense(512, activation='relu'))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dense(32, activation='relu'))
-    model.add(Dense(1, activation='sigmoid'))
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-    print(model.summary())
-    return model
-
-
 myModel = KerasClassifier(build_fn=create_model, epochs=100)
 
 #pipeline = make_pipeline(sequencer, padder, myModel)
@@ -149,75 +189,4 @@ print(classification_report(y_test, pred))
 print("The accuracy score is {:.2%}".format(accuracy_score(y_test, pred)))
 
 # Following is used to calculate fidelity for all instances using LIME
-'''
-# Creating an explainer object. We pass the class_names as an argument for prettier display.
-explainer = LimeTextExplainer(class_names=class_names)
-ids = list()
-fidelities = list()
-
-for i, e in enumerate(X_test):
-    print(str(i + 1) + '.', e)
-
-for i in range(len(X_test)):
-
-    print(i)
-    # Generate an explanation with at most n features for a random document in the test set.
-    idx = i
-    exp = explainer.explain_instance(X_test[idx], loaded_model.predict_proba, num_features=10)
-    #print('Document id: %d' % idx)
-    #print('Probability(neutral) =', c.predict_proba([X_test[idx]])[0, 1])
-    #print('True class: %s' % class_names[y_test[idx]])
-
-    #print("X_test[idx]", X_test[idx])
-    #print("X_test[idx][0]", (X_test[idx])[0])
-
-    label = pred[i]
-    label = label//2
-    print(label)
-    bb_probs = explainer.Zl[:, label]
-    print('bb_probs: ', bb_probs)
-    print(len(bb_probs))
-    lr_probs = explainer.lr.predict(explainer.Zlr)
-    print('lr_probs: ', lr_probs)
-    print(len(lr_probs))
-    fidelity = 1 - np.sum(np.abs(bb_probs - lr_probs) < 0.01) / len(bb_probs)
-    print('fidelity: ', fidelity)
-    print('np.sum: ', np.sum(np.abs(bb_probs - lr_probs) < 0.01))
-    ids.append(i)
-    fidelities.append(fidelity)
-
-fidelityMO = 0
-
-for i in range(len(ids)):
-    print(ids[i])
-    print(fidelities[i])
-    fidelityMO += fidelities[i]
-
-print("fidelityMO is: ", fidelityMO/len(ids))
-
-with open('LIME_hs_DNN.csv', mode='w', newline='') as file:
-    writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-    for i in range(len(ids)):
-        writer.writerow([ids[i], 'hate speech', 'DNN', fidelities[i]])
-
-
-# Generate an explanation with at most n features for a random document in the test set.
-idx = 221
-exp = explainer.explain_instance(X_test[idx], loaded_model.predict_proba, num_features=10)
-print('Document id: %d' % idx)
-print('Probability(neutral) =', loaded_model.predict_proba([X_test[idx]])[0, 1])
-print('True class: %s' % class_names[y_test[idx]])
-
-# The explanation is presented below as a list of weighted features along with a graph and the initial document.
-print(exp.as_list())
-weights = OrderedDict(exp.as_list())
-lime_w = pd.DataFrame({'words': list(weights.keys()), 'weights': list(weights.values())})
-sns.barplot(x="words", y="weights", data=lime_w)
-print(lime_w)
-plt.xticks(rotation=45)
-plt.title('Instance No{} features weights given by Lime'.format(idx))
-print(X_test[idx])
-plt.show()
-
-print("The accuracy score is {:.2%}".format(accuracy_score(y_test, pred)))
-'''
+calculate_fidelity()
