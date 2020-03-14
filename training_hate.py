@@ -1,8 +1,11 @@
 import pickle
+import random
+import re
 import string
 
 import numpy as np
 import pandas as pd
+import sklearn
 from nltk.tokenize import word_tokenize
 from scipy.spatial.distance import cdist
 from sklearn.metrics import accuracy_score
@@ -15,6 +18,23 @@ from functools import partial
 from imblearn.over_sampling import SMOTE
 from collections import Counter
 import csv
+import knn
+
+
+def my_clean(text):
+    text = text.lower().split()
+    text = [w for w in text]
+    text = " ".join(text)
+    text = re.sub(r"rt", "", text)
+    return text
+
+
+# Removes 'rt' from all input data
+def preProcessing(strings):
+    clean_tweet_texts = []
+    for string in strings:
+        clean_tweet_texts.append(my_clean(string))
+    return clean_tweet_texts
 
 
 def get_text_data(num_samples, data_path):
@@ -45,7 +65,7 @@ def get_text_data(num_samples, data_path):
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42, stratify=y, test_size=0.25)
 
-    new_X_test = X_test
+    new_X_test = preProcessing(X_test)
 
     for line in new_X_test:
         input_texts_original.append(line)
@@ -71,7 +91,7 @@ def get_text_data(num_samples, data_path):
         for word in input_text:  # This will be used to count the words and keep the most frequent ones
             all_input_words.append(word)
 
-    words_to_keep = 4499
+    words_to_keep = 4999
     most_common_words = [word for word, word_count in
                          Counter(all_input_words).most_common(words_to_keep)]  # Keep the 1000 most common words
     most_common_words.append('\t')
@@ -121,7 +141,7 @@ def get_text_data(num_samples, data_path):
         print('')
 
     return max_encoder_seq_length, num_encoder_tokens, final_input_words, input_token_index, reverse_input_char_index, \
-           encoder_input_data, decoder_input_data, input_texts_original
+           encoder_input_data, decoder_input_data, input_texts_original, X_test, y_test, new_X_test
 
 
 def decode(s):
@@ -224,8 +244,93 @@ def calculate_weights(Z, metric):
         distances = cdist(Zn, Zn[0].reshape(1, -1), metric=metric).ravel()
     else:
         distances = cdist(Z, Z[0].reshape(1, -1), metric=metric).ravel()
-        weights = kernel(distances)
-        return weights
+
+    weights = kernel(distances)
+    return weights
+
+
+def find_exemplars(Z, idxs, metric):
+    distances = list()
+    idx_distances = list()
+    for t in idxs:
+        distances.append(cdist(Z[0].reshape(1, -1), Z[t].reshape(1, -1), metric=metric).ravel())
+        idx_distances.append(t)
+
+    distances_dict = dict(zip(idx_distances, distances))
+    distances_sorted = {k: v for k, v in sorted(distances_dict.items(), key=lambda x: x[1])}
+    print('distances sorted: ', distances_sorted)
+    final_idxs, final_dists = zip(*list(distances_sorted.items()))
+
+    return final_idxs[1:]
+
+
+def find_counter_exemplars(Z, idxs, metric, count):
+    distances = list()
+    idx_distances = list()
+    for t in idxs:
+        distances.append(cdist(Z[0].reshape(1, -1), Z[t].reshape(1, -1), metric=metric).ravel())
+        idx_distances.append(t)
+
+    distances_dict = dict(zip(idx_distances, distances))
+    distances_sorted = {k: v for k, v in sorted(distances_dict.items(), key=lambda x: x[1])}
+    print('distances sorted: ', distances_sorted)
+    final_idxs, final_dists = zip(*list(distances_sorted.items()))
+    return final_idxs[:count]
+
+
+def knn_predict_on_synthetic_sentences(exemplars_holder, counter_exemplars_holder):
+    X_train = list()
+    y_train = list()
+    for t in range(len(exemplars_holder + counter_exemplars_holder)):
+        X_train = exemplars_holder + counter_exemplars_holder
+        if Yc[0] == 0:
+            y_train = [0 for i in range(nbr_exemplars)] + [2 for i in range(nbr_exemplars)]
+        else:
+            y_train = [2 for i in range(nbr_exemplars)] + [0 for i in range(nbr_exemplars)]
+
+    classifier.fit(X_train, y_train)
+
+    prediction = classifier.predict(Z_text[0])
+    return prediction
+
+
+def knn_predict_on_real_sentences(instance, instance_prediction, index, number_exemplars, sentences, classes):
+    del sentences[index]
+    del classes[index]
+
+    np_classes = np.array(classes)
+
+    neutral_sentence_list = list()
+    hate_sentence_list = list()
+    neutral_prediction_list = list()
+    hate_prediction_list = list()
+
+    neutral_class_idx = np.where(np_classes == 0)[0]
+    hate_class_idx = np.where(np_classes == 2)[0]
+
+    for t in neutral_class_idx:
+        neutral_sentence_list.append(sentences[t])
+        neutral_prediction_list.append(classes[t])
+
+    for t in hate_class_idx:
+        hate_sentence_list.append(sentences[t])
+        hate_prediction_list.append(classes[t])
+
+    neutral_dict = list(zip(neutral_sentence_list, neutral_prediction_list))  # make pairs out of the two lists
+    neutral_pairs = random.sample(neutral_dict, number_exemplars)  # pick k random pairs
+    X_neutral, y_neutral = zip(*neutral_pairs)  # separate the pairs
+
+    hate_dict = list(zip(hate_sentence_list, hate_prediction_list))  # make pairs out of the two lists
+    hate_pairs = random.sample(hate_dict, number_exemplars)  # pick k random pairs
+    X_hate, y_hate = zip(*hate_pairs)  # separate the pairs
+
+    X_train = X_neutral + X_hate
+    y_train = y_neutral + y_hate
+
+    classifier.fit(X_train, y_train)
+
+    prediction = classifier.predict(Z_text[0])
+    return prediction
 
 
 if __name__ == "__main__":
@@ -233,7 +338,7 @@ if __name__ == "__main__":
     res = get_text_data(num_samples=20000, data_path="data/hate_tweets.csv")
 
     max_encoder_seq_length, num_enc_tokens, characters, char2id, id2char, \
-    encoder_input_data, decoder_input_data, input_texts_original = res
+    encoder_input_data, decoder_input_data, input_texts_original, X_original, y_original, X_original_processed = res
 
     print(encoder_input_data.shape, "Creating model...")
 
@@ -250,12 +355,12 @@ if __name__ == "__main__":
                                                        latent_dim=latent_dim)
     print("Training VAE model...")
 
-    # vae.fit([encoder_input_data, decoder_input_data], encoder_input_data, epochs=epochs, verbose=1)
-    # vae.save('models/hate_vae_model.h5', overwrite=True)
-    # enc.save('models/hate_enc_model.h5', overwrite=True)
-    # gen.save('models/hate_gen_model.h5', overwrite=True)
-    # stepper.save('models/hate_stepper_model.h5', overwrite=True)
-
+    #vae.fit([encoder_input_data, decoder_input_data], encoder_input_data, epochs=epochs, verbose=1)
+    #vae.save('models/hate_vae_model.h5', overwrite=True)
+    #enc.save('models/hate_enc_model.h5', overwrite=True)
+    #gen.save('models/hate_gen_model.h5', overwrite=True)
+    #stepper.save('models/hate_stepper_model.h5', overwrite=True)
+    
     del vae
     del enc
     del gen
@@ -269,8 +374,7 @@ if __name__ == "__main__":
     print("Fitted, predicting...")
 
     # For how many sentences we want to run X-SPELLS
-    no_of_sentences = 5
-
+    no_of_sentences = 100
     in_sentences, state_in_sentences = get_sentences()
     print(in_sentences)
     training_state_list = np.array(state_in_sentences)
@@ -281,39 +385,54 @@ if __name__ == "__main__":
                                                                                 number_of_random_sentences=200,
                                                                                 probability=0.4)
 
-    pickled_black_box_filename = 'models/hate_saved_rf_model_stopwords_retained.sav'
+    datasetName = "hate"
+    modelName = "DNN"
+    pickled_black_box_filename = 'models/hate_saved_DNN_model.sav'
     pickled_vectorizer_filename = 'models/hate_tfidf_vectorizer.pickle'
 
     predictions, final_state_sentences, final_decoded_sentences = get_predictions(pickled_black_box_filename,
                                                                                   pickled_vectorizer_filename,
                                                                                   no_of_sentences)
 
-    print(predictions)
+    with open('data/' + datasetName + '_' + modelName + '_' + 'predictions', 'wb') as f:
+        pickle.dump(predictions, f)
+
+    with open('data/' + datasetName + '_' + modelName + '_' + 'final_state_sentences', 'wb') as f:
+        pickle.dump(final_state_sentences, f)
+
+    with open('data/' + datasetName + '_' + modelName + '_' + 'final_decoded_sentences', 'wb') as f:
+        pickle.dump(final_decoded_sentences, f)
+
+    with open('data/' + datasetName + '_' + modelName + '_' + 'predictions', 'rb') as f:
+        new_predictions = pickle.load(f)
+
+    with open('data/' + datasetName + '_' + modelName + '_' + 'final_state_sentences', 'rb') as f:
+        new_final_state_sentences = pickle.load(f)
+
+    with open('data/' + datasetName + '_' + modelName + '_' + 'final_decoded_sentences', 'rb') as f:
+        new_final_decoded_sentences = pickle.load(f)
 
     nbr_features = latent_dim
-    idx = []
-    fidelities = []
-    bbpreds = []
-    dtpreds = []
-    exemplars = []
-    topWords = []
+    idx, fidelities, bbpreds, dtpreds, knnpreds, knn_real_sentences_preds, true_classes, exemplars, counter_exemplars,\
+        top_exemplar_words, top_counter_exemplar_words = ([] for i in range(11))
 
-    for i in range(no_of_sentences):
+    for i in range(len(new_predictions)):
 
-        y = []
         print(i)
+        y = list()
 
-        if len(final_decoded_sentences[i]) < 60:
-            print(len(final_decoded_sentences[i]))
+        if len(new_final_decoded_sentences[i]) < 40:
+            print(len(new_final_decoded_sentences[i]))
             print('Not enough random sentences.')
             continue
 
         oversampling = 0
 
-        Z = final_state_sentences[i]
-        Z_text = final_decoded_sentences[i]
-        Yb = predictions[i]
-        selectedText = list()
+        Z = new_final_state_sentences[i]
+        Z_text = new_final_decoded_sentences[i]
+        Yb = new_predictions[i]
+        exemplars_holder = list()
+        counter_exemplars_holder = list()
 
         Y0 = (np.count_nonzero(Yb == 0))
         Y2 = (np.count_nonzero(Yb == 2))
@@ -327,19 +446,7 @@ if __name__ == "__main__":
 
         Z = np.array(Z)
         Yb = np.array(Yb)
-
         Z = Z.squeeze()  # convert from 3d to 2d
-
-        YbReshaped = Yb.reshape(1, -1)
-        ZReshaped = Z.reshape(1, -1)
-
-        metric = 'cosine'  # 'euclidean'
-        kernel_width = float(np.sqrt(nbr_features) * 0.75)
-        kernel = default_kernel
-        kernel = partial(kernel, kernel_width=kernel_width)
-
-        weights = calculate_weights(ZReshaped, metric)
-        class_values = ['0', '2']
 
         if oversampling is True:
             sm = SMOTE(random_state=42)
@@ -352,73 +459,167 @@ if __name__ == "__main__":
         for t in range(len(Z_text), len(Z)):
             Z_text.append(decode(y[t]))
 
-        print(len(Z_text))
-        print(len(Z))
+        # Calculate weights
+        metric = 'euclidean'  # 'euclidean'
+        kernel_width = float(np.sqrt(nbr_features) * 0.75)
+        kernel = default_kernel
+        kernel = partial(kernel, kernel_width=kernel_width)
+        weights = calculate_weights(Z, metric)
 
-        dt = decision_tree.learn_local_decision_tree(Z, Yb, weights, class_values, prune_tree=True)
+        # Train latent decision tree
+        class_values = ['0', '2']
+        dt = decision_tree.learn_local_decision_tree(Z, Yb, weights, class_values, prune_tree=False)
         Yc = dt.predict(Z)
-        print(Yc)
+        print('Yc: ', Yc)
+
+        opposite_prediction_idx = list()
+        for t in range(len(Yc)):
+            # We want the opposite of the instance's prediction
+            if Yc[0] == 0:
+                opposite_prediction_idx = np.where(Yc == 2)[0]
+            else:
+                opposite_prediction_idx = np.where(Yc == 0)[0]
+
+        print('opposite_prediction_idx: ', opposite_prediction_idx)
+        nbr_exemplars = 5
+        counter_exemplar_idxs = find_counter_exemplars(Z, opposite_prediction_idx, metric, count=nbr_exemplars)
+        print(counter_exemplar_idxs)
 
         leave_id = dt.apply(Z)
-        print(leave_id)
+        print('leave id: ', leave_id)
         others_in_same_leaf = np.where(leave_id == leave_id[0])[0]
-        print(others_in_same_leaf)
+        print('others in same leaf: ', others_in_same_leaf)
 
         print('original sentence: ', Z_text[0])
-        print('all sentences: ', Z_text)
+        #print('all sentences: ', Z_text)
+
+        if len(others_in_same_leaf) < nbr_exemplars:
+            print('Not enough exemplars in the leaf, will find by distance instead...', len(others_in_same_leaf))
+            same_prediction_idx = list()
+            for t in range(1, len(Yc)):
+                # We want the same as the instance's prediction
+                if Yc[0] == 0:
+                    same_prediction_idx = np.where(Yc == 0)[0]
+                else:
+                    same_prediction_idx = np.where(Yc == 2)[0]
+
+            unique_exemplars = list(set(find_exemplars(Z, same_prediction_idx, metric)))
+            print(unique_exemplars)
+            selected_exemplars = unique_exemplars[:nbr_exemplars]
+        else:
+            selected_exemplars = np.random.choice(others_in_same_leaf, size=nbr_exemplars, replace=False)
+
+        number_of_words = 5
+        print('exemplars:')
+        for j in selected_exemplars:
+            print(Z_text[j])
+            exemplars_holder.append(Z_text[j])
+
+        np_exemplars_holder = np.array(exemplars_holder)
+        vectorizer = CountVectorizer(stop_words='english')
+        X = vectorizer.fit_transform(np_exemplars_holder)
+        vocabulary = vectorizer.get_feature_names()
+        ind = np.argsort(X.toarray().sum(axis=0))[-number_of_words:]
+        top_n_exemplar_words = [vocabulary[a] for a in ind]
+        print(top_n_exemplar_words)
+
+        print('counter exemplars:')
+        for j in counter_exemplar_idxs:
+            print(Z_text[j])
+            counter_exemplars_holder.append(Z_text[j])
+
+        np_counter_exemplars_holder = np.array(counter_exemplars_holder)
+        vectorizer = CountVectorizer(stop_words='english')
+        X = vectorizer.fit_transform(np_counter_exemplars_holder)
+        vocabulary = vectorizer.get_feature_names()
+        ind = np.argsort(X.toarray().sum(axis=0))[-number_of_words:]
+        top_n_counter_exemplar_words = [vocabulary[a] for a in ind]
+        print(top_n_counter_exemplar_words)
+
+        # Train the knn classifier by using the exemplars and counter exemplars
+        classifier = knn.KNNClassifier(k=1, distance_type='path')
+
+        knn_synthetic_prediction = knn_predict_on_synthetic_sentences(exemplars_holder, counter_exemplars_holder)
+        knn_real_sentences_prediction = knn_predict_on_real_sentences(X_original[i], y_original[i], i, nbr_exemplars,
+                                                                      X_original.tolist(), y_original.tolist())
+
+        X_train = list()
+        y_train = list()
+        for t in range(len(exemplars_holder+counter_exemplars_holder)):
+            X_train = exemplars_holder+counter_exemplars_holder
+            if Yc[0] == 0:
+                y_train = [0 for i in range(nbr_exemplars)] + [2 for i in range(nbr_exemplars)]
+            else:
+                y_train = [2 for i in range(nbr_exemplars)] + [0 for i in range(nbr_exemplars)]
+
+        classifier.fit(X_train, y_train)
+
+        knn_prediction = classifier.predict(Z_text[0])
+        knnpreds.append(knn_synthetic_prediction)
+        knn_real_sentences_preds.append(knn_real_sentences_prediction)
+        true_classes.append(y_original[i])
+
+        print('original sentence', X_original[i])
+        print('true class', y_original[i])
+        print('knn synthetic prediction', knn_synthetic_prediction)
+        print('knn real prediction', knn_real_sentences_prediction)
         print('black box prediction', Yb[0])
         print('decision tree prediction', Yc[0])
 
         fidelity = accuracy_score(Yb, Yc)
-
         print('fidelity', fidelity)  # fidelity
-        nbr_exemplars = 5
-
-        if (len(others_in_same_leaf) < nbr_exemplars):
-            print('Not enough exemplars in the leaf')
-            continue
-
-        selected_exemplars = np.random.choice(others_in_same_leaf, size=nbr_exemplars, replace=False)
-
-        print('exemplars:')
-        for j in selected_exemplars:
-            print(Z_text[j])
-            selectedText.append(Z_text[j])
-
-        selectedText = np.array(selectedText)
-
-        number_of_words = 5
-        vectorizer = CountVectorizer(stop_words='english')
-        X = vectorizer.fit_transform(selectedText)
-
-        vocabulary = vectorizer.get_feature_names()
-        ind = np.argsort(X.toarray().sum(axis=0))[-number_of_words:]
-
-        top_n_words = [vocabulary[a] for a in ind]
-
-        print(top_n_words)
 
         idx.append(i)
         fidelities.append(fidelity)
         bbpreds.append(Yb[0])
         dtpreds.append(Yc[0])
-        exemplars.append(selectedText)
-        topWords.append(top_n_words)
+        exemplars.append(exemplars_holder)
+        counter_exemplars.append(counter_exemplars_holder)
+        top_exemplar_words.append(top_n_exemplar_words)
+        top_counter_exemplar_words.append(top_n_counter_exemplar_words)
 
         print('')
 
+    knn_synthetic_vs_true_fidelity = accuracy_score(knnpreds, true_classes)
+    knn_real_vs_true_fidelity = accuracy_score(knn_real_sentences_preds, true_classes)
+    print("synthetic knn fidelity is: ", knn_synthetic_vs_true_fidelity)
+    print("real knn fidelity is: ", knn_real_vs_true_fidelity)
+    print("sample size: ", len(knnpreds))
+    
+    print('exemplars: ', exemplars)
+
+    with open('data/' + datasetName + '_' + modelName + '_' + 'ids', 'wb') as f:
+        pickle.dump(idx, f)
+
+    with open('data/' + datasetName + '_' + modelName + '_' + 'exemplars', 'wb') as f:
+        pickle.dump(exemplars, f)
+
+    with open('data/' + datasetName + '_' + modelName + '_' + 'counter_exemplars', 'wb') as f:
+        pickle.dump(counter_exemplars, f)
+
+    with open('data/' + datasetName + '_' + modelName + '_' + 'top_exemplar_words', 'wb') as f:
+        pickle.dump(top_exemplar_words, f)
+
+    with open('data/' + datasetName + '_' + modelName + '_' + 'top_counter_exemplar_words', 'wb') as f:
+        pickle.dump(top_counter_exemplar_words, f)
+
     for i in range(len(idx)):
         print(idx[i])
-        print(final_decoded_sentences[i][0])
+        print('original sentence: ', X_original[i])
+        print('true class: ', y_original[i])
+        print(new_final_decoded_sentences[i][0])
         print(fidelities[i])
         print(bbpreds[i])
         print(dtpreds[i])
         print(exemplars[i])
-        print(topWords[i])
+        print(counter_exemplars[i])
+        print(top_exemplar_words[i])
+        print(top_counter_exemplar_words[i])
 
-    with open('output/hate_RF.csv', mode='w', newline='') as file:
+    with open('output/' + datasetName + '_' + modelName + '.csv', mode='w', newline='') as file:
         writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         for i in range(len(idx)):
             writer.writerow(
-                [idx[i], final_decoded_sentences[i][0], bbpreds[i], dtpreds[i], fidelities[i],
-                 exemplars[i], topWords[i]])
+                [idx[i], X_original[i], y_original[i], new_final_decoded_sentences[i][0], bbpreds[i], dtpreds[i],
+                 fidelities[i], exemplars[i], counter_exemplars[i], top_exemplar_words[i],
+                 top_counter_exemplar_words[i]])
