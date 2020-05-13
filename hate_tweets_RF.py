@@ -1,23 +1,23 @@
+"""
+Train a RF black box model for the hate speech dataset.
+
+Also calculate fidelity of LIME explanations when using the RF used for the fidelity experiment
+"""
+
 import csv
 import pickle
 import re
 import string
 
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
+import numpy as np
+import pandas as pd
 import sklearn
+from sklearn import feature_extraction
 from lime.lime_text import LimeTextExplainer
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plt
-import pandas as pd
 from sklearn.pipeline import make_pipeline
-import numpy as np
-from sklearn.model_selection import RandomizedSearchCV
 
 
 def cleanText(var):
@@ -38,10 +38,42 @@ def cleanText(var):
     return var
 
 
-def preProcessing(pX):
+# Removes 'rt' from all input data
+def my_clean(text):
+    text = text.lower().split()
+    text = [w for w in text]
+    text = " ".join(text)
+    text = re.sub(r"rt", "", text)
+    return text
+
+
+def strip_links(text):
+    link_regex = re.compile('((https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*)', re.DOTALL)
+    links = re.findall(link_regex, text)
+    for link in links:
+        text = text.replace(link[0], ', ')
+    return text
+
+
+def strip_all_entities(text):
+    entity_prefixes = ['@','#']
+    for separator in string.punctuation:
+        if separator not in entity_prefixes :
+            text = text.replace(separator,' ')
+    words = []
+    for word in text.split():
+        word = word.strip()
+        if word:
+            if word[0] not in entity_prefixes:
+                words.append(word)
+    return ' '.join(words)
+
+
+def preProcessing(strings):
     clean_tweet_texts = []
-    for t in pX:
-        clean_tweet_texts.append(cleanText(t))
+    for string in strings:
+        clean_tweet_texts.append(my_clean(strip_all_entities(strip_links(string))))
+        #clean_tweet_texts.append(my_clean(string))
     return clean_tweet_texts
 
 
@@ -85,7 +117,7 @@ def calculate_fidelity():
 
     print("fidelity average is: ", fidelity_average / len(ids))
 
-    with open('output/LIME_rf_DNN.csv', mode='w', newline='') as file:
+    with open('output/LIME_hs_RF.csv', mode='w', newline='') as file:
         writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         for i in range(len(ids)):
             writer.writerow([ids[i], 'hate speech', 'RF', fidelities[i]])
@@ -95,39 +127,41 @@ df = pd.read_csv("data/hate_tweets.csv", encoding='utf-8')
 # Removing the offensive comments, keeping only neutral and hatespeech,
 # in order to convert the problem to a simple binary classification problem
 df = df[df['class'] != 1]
-#X = df['tweet'].values
+X = df['tweet'].values
 y = df['class'].values
 class_names = ['hate', 'offensive', 'neutral']
 
-#X = preProcessing(X)
+X = preProcessing(X)
 
 filename = 'data/hate_stopwords_retained.csv'
+
+# Use the following to avoid reloading the data every time
 #with open(filename, 'w') as resultFile:
 #    wr = csv.writer(resultFile, dialect='excel')
 #    wr.writerow(X)
 
-X_new = []
-with open(filename, 'r') as f:
-    reader = csv.reader(f)
-    for row in reader:
-       X_new.extend(row)
+#X_new = []
+#with open(filename, 'r') as f:
+#    reader = csv.reader(f)
+#    for row in reader:
+#       X_new.extend(row)
 
-X_train, X_test, y_train, y_test = train_test_split(X_new, y, random_state=42, stratify=y, test_size=0.25)
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42, stratify=y, test_size=0.25)
 
 # We'll use the TF-IDF vectorizer, commonly used for text.
 vectorizer = sklearn.feature_extraction.text.TfidfVectorizer(sublinear_tf='false')
 train_vectors = vectorizer.fit_transform(X_train)
-#pickle.dump(vectorizer, open("models/hate_tfidf_vectorizer.pickle", "wb"))
+pickle.dump(vectorizer, open("models/hate_tfidf_vectorizer.pickle", "wb"))
 test_vectors = vectorizer.transform(X_test)
 
 # Using random forest for classification.
-#rf = RandomForestClassifier(bootstrap=True, class_weight=None, criterion='gini',
-#         max_depth=1000, max_features=1000, max_leaf_nodes=None,
-#         min_impurity_decrease=0.0, min_impurity_split=None,
-#         min_samples_leaf=4, min_samples_split=10,
-#         min_weight_fraction_leaf=0.0, n_estimators=400, n_jobs=None,
-#         oob_score=False, random_state=None, verbose=0,
-#         warm_start=False)
+rf = RandomForestClassifier(bootstrap=True, class_weight=None, criterion='gini',
+         max_depth=1000, max_features=1000, max_leaf_nodes=None,
+         min_impurity_decrease=0.0, min_impurity_split=None,
+         min_samples_leaf=4, min_samples_split=10,
+         min_weight_fraction_leaf=0.0, n_estimators=400, n_jobs=None,
+         oob_score=False, random_state=None, verbose=0,
+         warm_start=False)
 
 '''
 # Number of trees in random forest
@@ -160,11 +194,11 @@ rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid
 # Fit the random search model
 '''
 
-#rf.fit(train_vectors, y_train)
+rf.fit(train_vectors, y_train)
 
 # save the model to disk
-filename = 'models/hate_saved_rf_model_stopwords_retained.sav'
-#pickle.dump(rf, open(filename, 'wb'))
+filename = 'models/hate_saved_RF_model.sav'
+pickle.dump(rf, open(filename, 'wb'))
 
 # load the model from disk
 loaded_model = pickle.load(open(filename, 'rb'))

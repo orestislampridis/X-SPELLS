@@ -1,3 +1,9 @@
+"""
+Train a DNN black box model for the hate speech dataset.
+
+Also calculate fidelity of LIME explanations when using the DNN used for the fidelity experiment
+"""
+
 import csv
 import pickle
 import re
@@ -6,7 +12,6 @@ import string
 import nltk
 import numpy as np
 import pandas as pd
-import sklearn
 from keras.layers import Dense, LSTM, Dropout
 from keras.layers.embeddings import Embedding
 from keras.models import Sequential
@@ -17,17 +22,18 @@ from lime.lime_text import LimeTextExplainer
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
 
 
 class TextsToSequences(Tokenizer, BaseEstimator, TransformerMixin):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def fit(self,texts,y=None):
+    def fit(self, texts,y=None):
         self.fit_on_texts(texts)
         return self
 
-    def transform(self,texts,y=None):
+    def transform(self, texts, y=None):
         return np.array(self.texts_to_sequences(texts))
 
 
@@ -70,10 +76,42 @@ def cleanText(var):
     return var
 
 
-def preProcessing(pX):
+# Removes 'rt' from all input data
+def my_clean(text):
+    text = text.lower().split()
+    text = [w for w in text]
+    text = " ".join(text)
+    text = re.sub(r"rt", "", text)
+    return text
+
+
+def strip_links(text):
+    link_regex = re.compile('((https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*)', re.DOTALL)
+    links = re.findall(link_regex, text)
+    for link in links:
+        text = text.replace(link[0], ', ')
+    return text
+
+
+def strip_all_entities(text):
+    entity_prefixes = ['@','#']
+    for separator in  string.punctuation:
+        if separator not in entity_prefixes :
+            text = text.replace(separator,' ')
+    words = []
+    for word in text.split():
+        word = word.strip()
+        if word:
+            if word[0] not in entity_prefixes:
+                words.append(word)
+    return ' '.join(words)
+
+
+def preProcessing(strings):
     clean_tweet_texts = []
-    for t in pX:
-        clean_tweet_texts.append(cleanText(t))
+    for string in strings:
+        clean_tweet_texts.append(my_clean(strip_all_entities(strip_links(string))))
+        #clean_tweet_texts.append(my_clean(string))
     return clean_tweet_texts
 
 
@@ -144,11 +182,11 @@ df = pd.read_csv("data/hate_tweets.csv", encoding='utf-8')
 # Removing the offensive comments, keeping only neutral and hatespeech,
 # in order to convert the problem to a simple binary classification problem
 df = df[df['class'] != 1]
-#X = df['tweet'].values
+X = df['tweet'].values
 y = df['class'].values
 class_names = ['hate', 'offensive', 'neutral']
 
-#X = preProcessing(X)
+X = preProcessing(X)
 
 filename = 'data/hate_stopwords_retained.csv'
 #with open(filename, 'w') as resultFile:
@@ -161,23 +199,18 @@ with open(filename, 'r') as f:
     for row in reader:
        X_new.extend(row)
 
-X_train, X_test, y_train, y_test = train_test_split(X_new, y, random_state=42,
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42,
                                                     stratify=y, test_size=0.25)
-
-# We'll use the TF-IDF vectorizer, commonly used for text.
-vectorizer = sklearn.feature_extraction.text.TfidfVectorizer()
-train_vectors = vectorizer.fit_transform(X_train)
-test_vectors = vectorizer.transform(X_test)
 
 
 myModel = KerasClassifier(build_fn=create_model, epochs=100)
 
-#pipeline = make_pipeline(sequencer, padder, myModel)
-#pipeline.fit(X_train, y_train)
+pipeline = make_pipeline(sequencer, padder, myModel)
+pipeline.fit(X_train, y_train)
 
 # Save the model to disk
 filename = 'models/hate_saved_DNN_model.sav'
-#pickle.dump(pipeline, open(filename, 'wb'))
+pickle.dump(pipeline, open(filename, 'wb'))
 
 # Load the model from disk
 loaded_model = pickle.load(open(filename, 'rb'))
@@ -189,4 +222,4 @@ print(classification_report(y_test, pred))
 print("The accuracy score is {:.2%}".format(accuracy_score(y_test, pred)))
 
 # Following is used to calculate fidelity for all instances using LIME
-calculate_fidelity()
+# calculate_fidelity()
