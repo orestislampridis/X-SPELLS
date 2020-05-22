@@ -1,10 +1,6 @@
-import warnings
-
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.tree._tree import TREE_LEAF
-
-# from sklearn.exceptions import UndefinedMetricWarning
 
 
 def learn_local_decision_tree(Z, Yb, weights, class_values, multi_label=False, one_vs_rest=False, cv=5,
@@ -59,9 +55,9 @@ def prune_index(inner_tree, decisions, index=0):
 
     # Prune children if both children are leaves now and make the same decision:
     if (is_leaf(inner_tree, inner_tree.children_left[index]) and
-        is_leaf(inner_tree, inner_tree.children_right[index]) and
-        (decisions[index] == decisions[inner_tree.children_left[index]]) and
-        (decisions[index] == decisions[inner_tree.children_right[index]])):
+            is_leaf(inner_tree, inner_tree.children_right[index]) and
+            (decisions[index] == decisions[inner_tree.children_left[index]]) and
+            (decisions[index] == decisions[inner_tree.children_right[index]])):
         # turn node into a leaf by "unlinking" its children
         inner_tree.children_left[index] = TREE_LEAF
         inner_tree.children_right[index] = TREE_LEAF

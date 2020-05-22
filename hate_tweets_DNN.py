@@ -6,131 +6,15 @@ Also calculate fidelity of LIME explanations when using the DNN used for the fid
 
 import csv
 import pickle
-import re
-import string
 
-import nltk
 import numpy as np
-import pandas as pd
-from keras.layers import Dense, LSTM, Dropout
-from keras.layers.embeddings import Embedding
-from keras.models import Sequential
-from keras.preprocessing.sequence import pad_sequences
-from keras.preprocessing.text import Tokenizer
 from keras.wrappers.scikit_learn import KerasClassifier
 from lime.lime_text import LimeTextExplainer
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.metrics import classification_report, accuracy_score
-from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 
-
-class TextsToSequences(Tokenizer, BaseEstimator, TransformerMixin):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def fit(self, texts,y=None):
-        self.fit_on_texts(texts)
-        return self
-
-    def transform(self, texts, y=None):
-        return np.array(self.texts_to_sequences(texts))
-
-
-sequencer = TextsToSequences(num_words=35000)
-
-
-class Padder(BaseEstimator,TransformerMixin):
-    def __init__(self,maxlen=500):
-        self.maxlen = maxlen
-        self.max_index = None
-
-    def fit(self,X,y=None):
-        self.max_index = pad_sequences(X,maxlen=self.maxlen).max()
-        return self
-
-    def transform(self,X,y=None):
-        X = pad_sequences(X,maxlen=self.maxlen)
-        X[X>self.max_index] = 0
-        return X
-
-
-padder = Padder(140)
-
-
-def cleanText(var):
-    # replace punctuation with spaces
-    var = re.sub('[{}]'.format(string.punctuation), " ", var)
-    # remove double spaces
-    var = re.sub(r'\s+', " ", var)
-    # put in lower case
-    var = var.lower().split()
-    # remove words that are smaller than 2 characters
-    var = [w for w in var if len(w) >= 2]
-    # remove stop-words
-    # var = [w for w in var if w not in stopwords.words('english')]
-    # stemming
-    stemmer = nltk.PorterStemmer()
-    # var = [stemmer.stem(w) for w in var]
-    var = " ".join(var)
-    return var
-
-
-# Removes 'rt' from all input data
-def my_clean(text):
-    text = text.lower().split()
-    text = [w for w in text]
-    text = " ".join(text)
-    text = re.sub(r"rt", "", text)
-    return text
-
-
-def strip_links(text):
-    link_regex = re.compile('((https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*)', re.DOTALL)
-    links = re.findall(link_regex, text)
-    for link in links:
-        text = text.replace(link[0], ', ')
-    return text
-
-
-def strip_all_entities(text):
-    entity_prefixes = ['@','#']
-    for separator in  string.punctuation:
-        if separator not in entity_prefixes :
-            text = text.replace(separator,' ')
-    words = []
-    for word in text.split():
-        word = word.strip()
-        if word:
-            if word[0] not in entity_prefixes:
-                words.append(word)
-    return ' '.join(words)
-
-
-def preProcessing(strings):
-    clean_tweet_texts = []
-    for string in strings:
-        clean_tweet_texts.append(my_clean(strip_all_entities(strip_links(string))))
-        #clean_tweet_texts.append(my_clean(string))
-    return clean_tweet_texts
-
-
-
-def create_model():
-    model = Sequential()
-    model.add(Embedding(20000, 64, input_length=140, trainable=True))
-    model.add(Dropout(0.25))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dense(512, activation='relu'))
-    model.add(Dense(128, activation='relu'))
-    model.add(LSTM(100))
-    model.add(Dense(512, activation='relu'))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dense(32, activation='relu'))
-    model.add(Dense(1, activation='sigmoid'))
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-    print(model.summary())
-    return model
+from DNN_base import TextsToSequences, Padder, create_model
+from pre_processing import get_text_data
 
 
 def calculate_fidelity():
@@ -178,31 +62,11 @@ def calculate_fidelity():
             writer.writerow([ids[i], 'hate speech', 'DNN', fidelities[i]])
 
 
-df = pd.read_csv("data/hate_tweets.csv", encoding='utf-8')
-# Removing the offensive comments, keeping only neutral and hatespeech,
-# in order to convert the problem to a simple binary classification problem
-df = df[df['class'] != 1]
-X = df['tweet'].values
-y = df['class'].values
-class_names = ['hate', 'offensive', 'neutral']
+X_train, X_test, y_train, y_test, _ = get_text_data("data/hate_tweets.csv")
+class_names = ['neutral', 'hate-speech']
 
-X = preProcessing(X)
-
-filename = 'data/hate_stopwords_retained.csv'
-#with open(filename, 'w') as resultFile:
-#    wr = csv.writer(resultFile, dialect='excel')
-#    wr.writerow(X)
-
-X_new = []
-with open(filename, 'r') as f:
-    reader = csv.reader(f)
-    for row in reader:
-       X_new.extend(row)
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42,
-                                                    stratify=y, test_size=0.25)
-
-
+sequencer = TextsToSequences(num_words=35000)
+padder = Padder(140)
 myModel = KerasClassifier(build_fn=create_model, epochs=100)
 
 pipeline = make_pipeline(sequencer, padder, myModel)

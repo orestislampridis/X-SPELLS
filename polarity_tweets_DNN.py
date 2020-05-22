@@ -11,54 +11,16 @@ import string
 
 import numpy as np
 import pandas as pd
-from keras.layers import Dense, LSTM, Dropout
-from keras.layers.embeddings import Embedding
-from keras.models import Sequential
-from keras.preprocessing.sequence import pad_sequences
-from keras.preprocessing.text import Tokenizer
 from keras.wrappers.scikit_learn import KerasClassifier
 from lime.lime_text import LimeTextExplainer
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 
-
-class TextsToSequences(Tokenizer, BaseEstimator, TransformerMixin):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def fit(self,texts,y=None):
-        self.fit_on_texts(texts)
-        return self
-
-    def transform(self,texts,y=None):
-        return np.array(self.texts_to_sequences(texts))
-
-
-sequencer = TextsToSequences(num_words=35000)
-
-
-class Padder(BaseEstimator,TransformerMixin):
-    def __init__(self,maxlen=500):
-        self.maxlen = maxlen
-        self.max_index = None
-
-    def fit(self,X,y=None):
-        self.max_index = pad_sequences(X,maxlen=self.maxlen).max()
-        return self
-
-    def transform(self,X,y=None):
-        X = pad_sequences(X,maxlen=self.maxlen)
-        X[X>self.max_index] = 0
-        return X
-
-
-padder = Padder(140)
+from DNN_base import TextsToSequences, Padder, create_model
 
 
 def cleanText(var):
-
     # replace punctuation with spaces
     var = re.sub('[{}]'.format(string.punctuation), " ", var)
     # remove double spaces
@@ -68,10 +30,10 @@ def cleanText(var):
     # remove words that are smaller than 2 characters
     var = [w for w in var if len(w) >= 2]
     # remove stop-words
-    #var = [w for w in var if w not in stopwords.words('english')]
+    # var = [w for w in var if w not in stopwords.words('english')]
     # stemming
-    #stemmer = nltk.PorterStemmer()
-    #var = [stemmer.stem(w) for w in var]
+    # stemmer = nltk.PorterStemmer()
+    # var = [stemmer.stem(w) for w in var]
     var = " ".join(var)
     return var
 
@@ -81,23 +43,6 @@ def preProcessing(pX):
     for t in pX:
         clean_tweet_texts.append(cleanText(t))
     return clean_tweet_texts
-
-
-def create_model():
-    model = Sequential()
-    model.add(Embedding(20000, 64, input_length=140, trainable=True))
-    model.add(Dropout(0.25))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dense(512, activation='relu'))
-    model.add(Dense(128, activation='relu'))
-    model.add(LSTM(100))
-    model.add(Dense(512, activation='relu'))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dense(32, activation='relu'))
-    model.add(Dense(1, activation='sigmoid'))
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-    print(model.summary())
-    return model
 
 
 def calculate_fidelity():
@@ -111,13 +56,12 @@ def calculate_fidelity():
         print(str(i + 1) + '.', e)
 
     for i in range(len(X_test)):
-
         print('index: ', i)
         # Generate an explanation with at most n features for a random document in the test set.
         idx = i
         exp = explainer.explain_instance(X_test[idx], loaded_model.predict_proba, num_features=10)
         label = pred[i]
-        label = label//2
+        label = label // 2
 
         bb_probs = explainer.Zl[:, label]
         print('bb_probs: ', bb_probs)
@@ -137,7 +81,7 @@ def calculate_fidelity():
         print(fidelities[i])
         fidelity_average += fidelities[i]
 
-    print("fidelity average is: ", fidelity_average/len(ids))
+    print("fidelity average is: ", fidelity_average / len(ids))
 
     with open('output/LIME_po_DNN.csv', mode='w', newline='') as file:
         writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -148,25 +92,16 @@ def calculate_fidelity():
 df = pd.read_csv("polarity_tweets.csv", encoding='utf-8')
 # Removing the offensive comments, keeping only neutral and hatespeech,
 # in order to convert the problem to a simple binary classification problem
-#X = df['tweet'].values
+X = df['tweet'].values
 y = df['class'].values
 class_names = ['negative', 'positive']
 
-#X = preProcessing(X)
+X = preProcessing(X)
 
-filename = 'data/polarity_stopwords_retained.csv'
-#with open(filename, 'w') as resultFile:
-#    wr = csv.writer(resultFile, dialect='excel')
-#    wr.writerow(X)
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42, stratify=y, test_size=0.25)
 
-X_new = []
-with open(filename, 'r') as f:
-    reader = csv.reader(f)
-    for row in reader:
-       X_new.extend(row)
-
-X_train, X_test, y_train, y_test = train_test_split(X_new, y, random_state=42, stratify=y, test_size=0.25)
-
+sequencer = TextsToSequences(num_words=35000)
+padder = Padder(140)
 myModel = KerasClassifier(build_fn=create_model, epochs=100)
 
 pipeline = make_pipeline(sequencer, padder, myModel)
@@ -180,7 +115,7 @@ pickle.dump(pipeline, open(filename, 'wb'))
 loaded_model = pickle.load(open(filename, 'rb'))
 
 # Computing interesting metrics/classification report
-#pred = pipeline.predict(X_test)
+# pred = pipeline.predict(X_test)
 pred = loaded_model.predict(X_test)
 print(classification_report(y_test, pred))
 print("The accuracy score is {:.2%}".format(accuracy_score(y_test, pred)))

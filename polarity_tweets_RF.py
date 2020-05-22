@@ -12,7 +12,6 @@ import string
 import numpy as np
 import pandas as pd
 import sklearn
-from sklearn import feature_extraction
 from lime.lime_text import LimeTextExplainer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
@@ -98,23 +97,12 @@ class_names = ['negative', 'positive']
 
 X = preProcessing(X)
 
-# filename = 'data/polarity_stopwords_retained.csv'
-# with open(filename, 'w') as resultFile:
-#    wr = csv.writer(resultFile, dialect='excel')
-#    wr.writerow(X)
-
-#X_new = []
-#with open(filename, 'r') as f:
-#    reader = csv.reader(f)
-#    for row in reader:
-#        X_new.extend(row)
-
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42, stratify=y, test_size=0.25)
 
 # We'll use the TF-IDF vectorizer, commonly used for text.
 vectorizer = sklearn.feature_extraction.text.TfidfVectorizer(sublinear_tf='false')
 train_vectors = vectorizer.fit_transform(X_train)
-#pickle.dump(vectorizer, open("models/polarity_tfidf_vectorizer.pickle", "wb"))
+# pickle.dump(vectorizer, open("models/polarity_tfidf_vectorizer.pickle", "wb"))
 test_vectors = vectorizer.transform(X_test)
 
 # Using random forest for classification.

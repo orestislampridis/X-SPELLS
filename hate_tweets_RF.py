@@ -6,75 +6,15 @@ Also calculate fidelity of LIME explanations when using the RF used for the fide
 
 import csv
 import pickle
-import re
-import string
 
 import numpy as np
-import pandas as pd
 import sklearn
-from sklearn import feature_extraction
 from lime.lime_text import LimeTextExplainer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
-from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 
-
-def cleanText(var):
-    # replace punctuation with spaces
-    var = re.sub('[{}]'.format(string.punctuation), " ", var)
-    # remove double spaces
-    var = re.sub(r'\s+', " ", var)
-    # put in lower case
-    var = var.lower().split()
-    # remove words that are smaller than 3 characters
-    var = [w for w in var if len(w) >= 3]
-    # remove stop-words
-    #var = [w for w in var if w not in stopwords.words('english')]
-    # stemming
-    #stemmer = nltk.PorterStemmer()
-    #var = [stemmer.stem(w) for w in var]
-    var = " ".join(var)
-    return var
-
-
-# Removes 'rt' from all input data
-def my_clean(text):
-    text = text.lower().split()
-    text = [w for w in text]
-    text = " ".join(text)
-    text = re.sub(r"rt", "", text)
-    return text
-
-
-def strip_links(text):
-    link_regex = re.compile('((https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*)', re.DOTALL)
-    links = re.findall(link_regex, text)
-    for link in links:
-        text = text.replace(link[0], ', ')
-    return text
-
-
-def strip_all_entities(text):
-    entity_prefixes = ['@','#']
-    for separator in string.punctuation:
-        if separator not in entity_prefixes :
-            text = text.replace(separator,' ')
-    words = []
-    for word in text.split():
-        word = word.strip()
-        if word:
-            if word[0] not in entity_prefixes:
-                words.append(word)
-    return ' '.join(words)
-
-
-def preProcessing(strings):
-    clean_tweet_texts = []
-    for string in strings:
-        clean_tweet_texts.append(my_clean(strip_all_entities(strip_links(string))))
-        #clean_tweet_texts.append(my_clean(string))
-    return clean_tweet_texts
+from pre_processing import get_text_data
 
 
 def calculate_fidelity():
@@ -123,30 +63,8 @@ def calculate_fidelity():
             writer.writerow([ids[i], 'hate speech', 'RF', fidelities[i]])
 
 
-df = pd.read_csv("data/hate_tweets.csv", encoding='utf-8')
-# Removing the offensive comments, keeping only neutral and hatespeech,
-# in order to convert the problem to a simple binary classification problem
-df = df[df['class'] != 1]
-X = df['tweet'].values
-y = df['class'].values
-class_names = ['hate', 'offensive', 'neutral']
-
-X = preProcessing(X)
-
-filename = 'data/hate_stopwords_retained.csv'
-
-# Use the following to avoid reloading the data every time
-#with open(filename, 'w') as resultFile:
-#    wr = csv.writer(resultFile, dialect='excel')
-#    wr.writerow(X)
-
-#X_new = []
-#with open(filename, 'r') as f:
-#    reader = csv.reader(f)
-#    for row in reader:
-#       X_new.extend(row)
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42, stratify=y, test_size=0.25)
+X_train, X_test, y_train, y_test, _ = get_text_data("data/hate_tweets.csv")
+class_names = ['neutral', 'hate-speech']
 
 # We'll use the TF-IDF vectorizer, commonly used for text.
 vectorizer = sklearn.feature_extraction.text.TfidfVectorizer(sublinear_tf='false')
@@ -156,12 +74,12 @@ test_vectors = vectorizer.transform(X_test)
 
 # Using random forest for classification.
 rf = RandomForestClassifier(bootstrap=True, class_weight=None, criterion='gini',
-         max_depth=1000, max_features=1000, max_leaf_nodes=None,
-         min_impurity_decrease=0.0, min_impurity_split=None,
-         min_samples_leaf=4, min_samples_split=10,
-         min_weight_fraction_leaf=0.0, n_estimators=400, n_jobs=None,
-         oob_score=False, random_state=None, verbose=0,
-         warm_start=False)
+                            max_depth=1000, max_features=1000, max_leaf_nodes=None,
+                            min_impurity_decrease=0.0, min_impurity_split=None,
+                            min_samples_leaf=4, min_samples_split=10,
+                            min_weight_fraction_leaf=0.0, n_estimators=400, n_jobs=None,
+                            oob_score=False, random_state=None, verbose=0,
+                            warm_start=False)
 
 '''
 # Number of trees in random forest
