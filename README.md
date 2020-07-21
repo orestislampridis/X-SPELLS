@@ -1,6 +1,6 @@
 # X-SPELLS
 
-XSPELLS - eXplaining Sentiment Prediction by generating ExempLars in the Latent Space
+<h4>XSPELLS - eXplaining Sentiment Prediction by generating ExempLars in the Latent Space</h4>
 
 Explaining Sentiment Classification with Synthetic Exemplars and Counter-Exemplars
 
