@@ -7,6 +7,9 @@ from collections import Counter
 
 import numpy as np
 import pandas as pd
+import nltk
+# nltk.download()
+
 from nltk.tokenize import word_tokenize
 from sklearn.model_selection import train_test_split
 
@@ -114,7 +117,7 @@ def decode(s):
 
 
 if __name__ == "__main__":
-    dataset_name = 'polarity'
+    dataset_name = 'hate'
     res = get_text_data(num_samples=20000, data_path='data/' + dataset_name + '_tweets.csv', dataset=dataset_name)
 
     max_encoder_seq_length, num_enc_tokens, characters, char2id, id2char, \
@@ -126,7 +129,7 @@ if __name__ == "__main__":
     batch_size = 1
     latent_dim = 500
     intermediate_dim = 256
-    epochs = 100
+    epochs = 200
 
     vae, enc, gen, stepper, vae_loss = create_lstm_vae(input_dim,
                                                        batch_size=batch_size,
@@ -135,7 +138,7 @@ if __name__ == "__main__":
     print("Training VAE model...")
 
     vae.fit([encoder_input_data, decoder_input_data], encoder_input_data, epochs=epochs, verbose=1)
-    vae.save('models/' + dataset_name + '_vae_model.h5', overwrite=True)
-    enc.save('models/' + dataset_name + '_enc_model.h5', overwrite=True)
-    gen.save('models/' + dataset_name + '_gen_model.h5', overwrite=True)
-    stepper.save('models/' + dataset_name + '_stepper_model.h5', overwrite=True)
+    vae.save('models/' + dataset_name + 'new_vae_model.h5', overwrite=True)
+    enc.save('models/' + dataset_name + 'new_enc_model.h5', overwrite=True)
+    gen.save('models/' + dataset_name + 'new_gen_model.h5', overwrite=True)
+    stepper.save('models/' + dataset_name + 'new_stepper_model.h5', overwrite=True)

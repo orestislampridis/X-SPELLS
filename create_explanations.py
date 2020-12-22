@@ -4,7 +4,6 @@ from functools import partial
 from statistics import stdev
 
 import numpy as np
-import pydot_ng as pydot
 import sklearn
 from imblearn.over_sampling import SMOTE
 from keras.models import load_model
@@ -16,7 +15,6 @@ from sklearn.metrics import accuracy_score
 import decision_tree
 from lstm_vae import inference
 
-pydot.find_graphviz()
 import csv
 import train_vae
 from DNN_base import TextsToSequences, Padder, create_model
@@ -27,10 +25,10 @@ myModel = KerasClassifier(build_fn=create_model, epochs=100)
 
 
 def load_VAE(dataset_name):
-    vae = load_model('models/' + dataset_name + '_vae_model.h5', compile=False)
-    enc = load_model('models/' + dataset_name + '_enc_model.h5', compile=False)
-    gen = load_model('models/' + dataset_name + '_gen_model.h5', compile=False)
-    stepper = load_model('models/' + dataset_name + '_stepper_model.h5', compile=False)
+    vae = load_model('models/' + dataset_name + 'new_vae_model.h5', compile=False)
+    enc = load_model('models/' + dataset_name + 'new_enc_model.h5', compile=False)
+    gen = load_model('models/' + dataset_name + 'new_gen_model.h5', compile=False)
+    stepper = load_model('models/' + dataset_name + 'new_stepper_model.h5', compile=False)
     vae.summary()
     return vae, enc, gen, stepper
 
@@ -50,10 +48,10 @@ def get_sentences():
         seq = mean + variance * seq
         input_sentences.append(X_original_processed[i])
         state_input_sentences.append(seq)
-        # decoded_sentences.append(decode(seq))
+        decoded_sentences.append(decode(seq))
 
-    # return input_sentences, state_input_sentences, decoded_sentences
-    return input_sentences, state_input_sentences
+    return input_sentences, state_input_sentences, decoded_sentences
+    # return input_sentences, state_input_sentences
 
 
 def calculate_MRE():
@@ -63,9 +61,8 @@ def calculate_MRE():
     for i in range(int(len(encoder_input_data))):
         print(i)
         mean, variance = enc.predict([[encoder_input_data[i]]])
-        # seq = np.random.normal(size=(latent_dim,))
-        seq = mean
-        # seq = mean + variance * seq
+        seq = np.random.normal(size=(latent_dim,))
+        seq = mean + variance * seq
         print('original: ', X_original_processed[i])
         print('reconstructed: ', decode(seq))
         train_input_sentences.append(X_original_processed[i])
@@ -142,7 +139,7 @@ def get_predictions(bb_filename, vect_filename, number_of_sentences):
     if vect_filename is None:
         for i in range(number_of_sentences):
             final_unique_state_sentences[i].append(latent_space_state[i])
-            final_unique_decoded_sentences[i].append(in_sentences[i])
+            final_unique_decoded_sentences[i].append(decoded_sentences[i])
 
             final_unique_state_sentences[i].extend(generated_state_sentences[i])
             final_unique_decoded_sentences[i].extend(generated_decoded_sentences[i])
@@ -334,7 +331,7 @@ if __name__ == "__main__":
     pickled_vectorizer_filename = 'models/' + dataset_name + '_tfidf_vectorizer.pickle'
 
     # For how many sentences we want to run X-SPELLS
-    no_of_sentences = 100
+    no_of_sentences = 2
     latent_dim = 500
     nbr_features = latent_dim
 
@@ -346,8 +343,9 @@ if __name__ == "__main__":
     input_dim = encoder_input_data.shape[-1]
 
     vae, enc, gen, stepper = load_VAE(dataset_name)
+    # calculate_MRE()
 
-    in_sentences, latent_space_state = get_sentences()
+    in_sentences, latent_space_state, decoded_sentences = get_sentences()
     smallest_x, largest_x = calculate_min_max(np.array(latent_space_state))
 
     generated_state_sentences, generated_decoded_sentences = generate_sentences(number_of_sentences=no_of_sentences,
