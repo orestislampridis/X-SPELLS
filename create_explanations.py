@@ -25,10 +25,10 @@ myModel = KerasClassifier(build_fn=create_model, epochs=100)
 
 
 def load_VAE(dataset_name):
-    vae = load_model('models/' + dataset_name + 'new_vae_model.h5', compile=False)
-    enc = load_model('models/' + dataset_name + 'new_enc_model.h5', compile=False)
-    gen = load_model('models/' + dataset_name + 'new_gen_model.h5', compile=False)
-    stepper = load_model('models/' + dataset_name + 'new_stepper_model.h5', compile=False)
+    vae = load_model('models/' + dataset_name + '_new_vae_model.h5', compile=False)
+    enc = load_model('models/' + dataset_name + '_new_enc_model.h5', compile=False)
+    gen = load_model('models/' + dataset_name + '_new_gen_model.h5', compile=False)
+    stepper = load_model('models/' + dataset_name + '_new_stepper_model.h5', compile=False)
     vae.summary()
     return vae, enc, gen, stepper
 
@@ -145,7 +145,11 @@ def get_predictions(bb_filename, vect_filename, number_of_sentences):
             final_unique_decoded_sentences[i].extend(generated_decoded_sentences[i])
 
             # Predicting
-            preds[i] = loaded_model.predict(final_unique_decoded_sentences[i])
+            print(loaded_model.predict(final_unique_decoded_sentences[i]))
+            print(loaded_model.predict(final_unique_decoded_sentences[i]).flatten())
+
+            preds[i] = loaded_model.predict(final_unique_decoded_sentences[i]).flatten()
+        preds = preds[0]
     else:
         # Load the TF-IDF vectorizer of the respective dataset
         vectorizer = pickle.load(open(vect_filename, 'rb'))
@@ -325,13 +329,20 @@ def create_explanations_csv():
 
 if __name__ == "__main__":
     # Initialize stuff
+    # Insert 'hate' or 'polarity' as dataset
     dataset_name = "hate"
+    # Insert 'RF' or 'DNN' as black box model
     model_name = "RF"
     pickled_black_box_filename = 'models/' + dataset_name + '_saved_' + model_name + '_model.sav'
-    pickled_vectorizer_filename = 'models/' + dataset_name + '_tfidf_vectorizer.pickle'
+
+    if model_name == "RF":
+        pickled_vectorizer_filename = 'models/' + dataset_name + '_tfidf_vectorizer.pickle'
+    elif model_name == "DNN":
+        # Insert None in vectorizer if black box is DNN
+        pickled_vectorizer_filename = None
 
     # For how many sentences we want to run X-SPELLS
-    no_of_sentences = 2
+    no_of_sentences = 3
     latent_dim = 500
     nbr_features = latent_dim
 

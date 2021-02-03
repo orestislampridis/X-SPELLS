@@ -117,6 +117,7 @@ def decode(s):
 
 
 if __name__ == "__main__":
+    # Insert 'hate' or 'polarity' as dataset
     dataset_name = 'hate'
     res = get_text_data(num_samples=20000, data_path='data/' + dataset_name + '_tweets.csv', dataset=dataset_name)
 
@@ -129,7 +130,11 @@ if __name__ == "__main__":
     batch_size = 1
     latent_dim = 500
     intermediate_dim = 256
-    epochs = 200
+
+    if dataset_name == 'hate':
+        epochs = 200
+    elif dataset_name == 'polarity':
+        epochs = 250
 
     vae, enc, gen, stepper, vae_loss = create_lstm_vae(input_dim,
                                                        batch_size=batch_size,

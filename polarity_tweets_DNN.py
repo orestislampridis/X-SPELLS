@@ -18,31 +18,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 
 from DNN_base import TextsToSequences, Padder, create_model
-
-
-def cleanText(var):
-    # replace punctuation with spaces
-    var = re.sub('[{}]'.format(string.punctuation), " ", var)
-    # remove double spaces
-    var = re.sub(r'\s+', " ", var)
-    # put in lower case
-    var = var.lower().split()
-    # remove words that are smaller than 2 characters
-    var = [w for w in var if len(w) >= 2]
-    # remove stop-words
-    # var = [w for w in var if w not in stopwords.words('english')]
-    # stemming
-    # stemmer = nltk.PorterStemmer()
-    # var = [stemmer.stem(w) for w in var]
-    var = " ".join(var)
-    return var
-
-
-def preProcessing(pX):
-    clean_tweet_texts = []
-    for t in pX:
-        clean_tweet_texts.append(cleanText(t))
-    return clean_tweet_texts
+from pre_processing import get_text_data
 
 
 def calculate_fidelity():
@@ -63,7 +39,7 @@ def calculate_fidelity():
         label = pred[i]
         label = label // 2
 
-        bb_probs = explainer.Zl[:, label]
+        bb_probs = explainer.Zl[:, label].flatten()
         print('bb_probs: ', bb_probs)
         lr_probs = explainer.lr.predict(explainer.Zlr)
         print('lr_probs: ', lr_probs)
@@ -89,20 +65,12 @@ def calculate_fidelity():
             writer.writerow([ids[i], 'polarity', 'DNN', fidelities[i]])
 
 
-df = pd.read_csv("polarity_tweets.csv", encoding='utf-8')
-# Removing the offensive comments, keeping only neutral and hatespeech,
-# in order to convert the problem to a simple binary classification problem
-X = df['tweet'].values
-y = df['class'].values
+X_train, X_test, y_train, y_test, _ = get_text_data("data/polarity_tweets.csv", 'polarity')
 class_names = ['negative', 'positive']
-
-X = preProcessing(X)
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42, stratify=y, test_size=0.25)
 
 sequencer = TextsToSequences(num_words=35000)
 padder = Padder(140)
-myModel = KerasClassifier(build_fn=create_model, epochs=100)
+myModel = KerasClassifier(build_fn=create_model, epochs=10)
 
 pipeline = make_pipeline(sequencer, padder, myModel)
 pipeline.fit(X_train, y_train)

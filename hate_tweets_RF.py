@@ -8,9 +8,9 @@ import csv
 import pickle
 
 import numpy as np
-import sklearn
 from lime.lime_text import LimeTextExplainer
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.pipeline import make_pipeline
 
@@ -63,11 +63,11 @@ def calculate_fidelity():
             writer.writerow([ids[i], 'hate speech', 'RF', fidelities[i]])
 
 
-X_train, X_test, y_train, y_test, _ = get_text_data("data/hate_tweets.csv")
+X_train, X_test, y_train, y_test, _ = get_text_data("data/hate_tweets.csv", "hate")
 class_names = ['neutral', 'hate-speech']
 
 # We'll use the TF-IDF vectorizer, commonly used for text.
-vectorizer = sklearn.feature_extraction.text.TfidfVectorizer(sublinear_tf='false')
+vectorizer = TfidfVectorizer(sublinear_tf='false')
 train_vectors = vectorizer.fit_transform(X_train)
 pickle.dump(vectorizer, open("models/hate_tfidf_vectorizer.pickle", "wb"))
 test_vectors = vectorizer.transform(X_test)
@@ -127,4 +127,4 @@ print(classification_report(y_test, pred))
 print("The accuracy score is {:.2%}".format(accuracy_score(y_test, pred)))
 
 # Following is used to calculate fidelity for all instances using LIME
-calculate_fidelity()
+# calculate_fidelity()

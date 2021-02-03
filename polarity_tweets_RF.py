@@ -14,9 +14,12 @@ import pandas as pd
 import sklearn
 from lime.lime_text import LimeTextExplainer
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
+
+from pre_processing import get_text_data
 
 
 def cleanText(var):
@@ -90,19 +93,13 @@ def calculate_fidelity():
             writer.writerow([ids[i], 'hate speech', 'RF', fidelities[i]])
 
 
-df = pd.read_csv("data/polarity_tweets.csv", encoding='utf-8')
-X = df['tweet'].values
-y = df['class'].values
+X_train, X_test, y_train, y_test, _ = get_text_data("data/polarity_tweets.csv", 'polarity')
 class_names = ['negative', 'positive']
 
-X = preProcessing(X)
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42, stratify=y, test_size=0.25)
-
 # We'll use the TF-IDF vectorizer, commonly used for text.
-vectorizer = sklearn.feature_extraction.text.TfidfVectorizer(sublinear_tf='false')
+vectorizer = TfidfVectorizer(sublinear_tf='false')
 train_vectors = vectorizer.fit_transform(X_train)
-# pickle.dump(vectorizer, open("models/polarity_tfidf_vectorizer.pickle", "wb"))
+pickle.dump(vectorizer, open("models/polarity_tfidf_vectorizer.pickle", "wb"))
 test_vectors = vectorizer.transform(X_test)
 
 # Using random forest for classification.
@@ -118,7 +115,7 @@ rf.fit(train_vectors, y_train)
 
 # Save the model to disk
 filename = 'models/polarity_saved_RF_model.sav'
-# pickle.dump(rf, open(filename, 'wb'))
+pickle.dump(rf, open(filename, 'wb'))
 
 # Load the model from disk
 loaded_model = pickle.load(open(filename, 'rb'))
