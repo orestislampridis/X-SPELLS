@@ -25,10 +25,10 @@ myModel = KerasClassifier(build_fn=create_model, epochs=100)
 
 
 def load_VAE(dataset_name):
-    vae = load_model('models/' + dataset_name + '_new_vae_model.h5', compile=False)
-    enc = load_model('models/' + dataset_name + '_new_enc_model.h5', compile=False)
-    gen = load_model('models/' + dataset_name + '_new_gen_model.h5', compile=False)
-    stepper = load_model('models/' + dataset_name + '_new_stepper_model.h5', compile=False)
+    vae = load_model('models/' + dataset_name + '_vae_model.h5', compile=False)
+    enc = load_model('models/' + dataset_name + '_enc_model.h5', compile=False)
+    gen = load_model('models/' + dataset_name + '_gen_model.h5', compile=False)
+    stepper = load_model('models/' + dataset_name + '_stepper_model.h5', compile=False)
     vae.summary()
     return vae, enc, gen, stepper
 

@@ -143,7 +143,7 @@ if __name__ == "__main__":
     print("Training VAE model...")
 
     vae.fit([encoder_input_data, decoder_input_data], encoder_input_data, epochs=epochs, verbose=1)
-    vae.save('models/' + dataset_name + 'new_vae_model.h5', overwrite=True)
-    enc.save('models/' + dataset_name + 'new_enc_model.h5', overwrite=True)
-    gen.save('models/' + dataset_name + 'new_gen_model.h5', overwrite=True)
-    stepper.save('models/' + dataset_name + 'new_stepper_model.h5', overwrite=True)
+    vae.save('models/' + dataset_name + '_vae_model.h5', overwrite=True)
+    enc.save('models/' + dataset_name + '_enc_model.h5', overwrite=True)
+    gen.save('models/' + dataset_name + '_gen_model.h5', overwrite=True)
+    stepper.save('models/' + dataset_name + '_stepper_model.h5', overwrite=True)
