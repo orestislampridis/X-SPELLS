@@ -37,7 +37,7 @@ def calculate_fidelity():
         exp = explainer.explain_instance(X_test[idx], c.predict_proba, num_features=10)
 
         label = loaded_model.predict(test_vectors[idx])[0]
-        label = label // 2
+        # label = label // 2
         print(label)
         bb_probs = explainer.Zl[:, label]
         print('bb_probs: ', bb_probs)
@@ -127,4 +127,4 @@ print(classification_report(y_test, pred))
 print("The accuracy score is {:.2%}".format(accuracy_score(y_test, pred)))
 
 # Following is used to calculate fidelity for all instances using LIME
-# calculate_fidelity()
+calculate_fidelity()

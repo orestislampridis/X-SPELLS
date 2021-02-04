@@ -67,7 +67,7 @@ def calculate_fidelity():
         exp = explainer.explain_instance(X_test[idx], c.predict_proba, num_features=10)
 
         label = loaded_model.predict(test_vectors[idx])[0]
-        label = label // 2
+        # label = label // 2
         print(label)
         bb_probs = explainer.Zl[:, label]
         print('bb_probs: ', bb_probs)
