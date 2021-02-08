@@ -22,31 +22,6 @@ from sklearn.pipeline import make_pipeline
 from pre_processing import get_text_data
 
 
-def cleanText(var):
-    # replace punctuation with spaces
-    var = re.sub('[{}]'.format(string.punctuation), " ", var)
-    # remove double spaces
-    var = re.sub(r'\s+', " ", var)
-    # put in lower case
-    var = var.lower().split()
-    # remove words that are smaller than 2 characters
-    var = [w for w in var if len(w) >= 3]
-    # remove stop-words
-    # var = [w for w in var if w not in stopwords.words('english')]
-    # stemming
-    # stemmer = nltk.PorterStemmer()
-    # var = [stemmer.stem(w) for w in var]
-    var = " ".join(var)
-    return var
-
-
-def preProcessing(pX):
-    clean_tweet_texts = []
-    for t in pX:
-        clean_tweet_texts.append(cleanText(t))
-    return clean_tweet_texts
-
-
 def calculate_fidelity():
     # Lime explainers assume that classifiers act on raw text, but sklearn classifiers act on
     # vectorized representation of texts (tf-idf in this case). For this purpose, we will use
@@ -73,7 +48,7 @@ def calculate_fidelity():
         print('bb_probs: ', bb_probs)
         lr_probs = explainer.lr.predict(explainer.Zlr)
         print('lr_probs: ', lr_probs)
-        fidelity = 1 - np.sum(np.abs(bb_probs - lr_probs) < 0.01) / len(bb_probs)
+        fidelity = np.sum(np.abs(bb_probs - lr_probs) < 0.01) / len(bb_probs)
         print('fidelity: ', fidelity)
         ids.append(i)
         fidelities.append(fidelity)

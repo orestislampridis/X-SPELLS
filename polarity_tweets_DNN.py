@@ -43,7 +43,7 @@ def calculate_fidelity():
         print('bb_probs: ', bb_probs)
         lr_probs = explainer.lr.predict(explainer.Zlr)
         print('lr_probs: ', lr_probs)
-        fidelity = 1 - np.sum(np.abs(bb_probs - lr_probs) < 0.01) / len(bb_probs)
+        fidelity = np.sum(np.abs(bb_probs - lr_probs) < 0.01) / len(bb_probs)
         print('fidelity: ', fidelity)
         print('np.sum: ', np.sum(np.abs(bb_probs - lr_probs) < 0.01))
         ids.append(i)
@@ -72,12 +72,12 @@ sequencer = TextsToSequences(num_words=35000)
 padder = Padder(140)
 myModel = KerasClassifier(build_fn=create_model, epochs=10)
 
-#pipeline = make_pipeline(sequencer, padder, myModel)
-#pipeline.fit(X_train, y_train)
+pipeline = make_pipeline(sequencer, padder, myModel)
+pipeline.fit(X_train, y_train)
 
 # Save the model to disk
 filename = 'models/polarity_saved_DNN_model.sav'
-#pickle.dump(pipeline, open(filename, 'wb'))
+pickle.dump(pipeline, open(filename, 'wb'))
 
 # Load the model from disk
 loaded_model = pickle.load(open(filename, 'rb'))

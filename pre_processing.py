@@ -79,8 +79,8 @@ def get_text_data(data_path, dataset):
         X = df['tweet'].values
         y = df['class'].apply(lambda x: 1 if x == 2 else 0).values
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42, stratify=y, test_size=0.25)
+    X_train, X_test, y_train, y_test = train_test_split(preProcessing(X), y, random_state=42, stratify=y, test_size=0.25)
 
-    new_X_test = preProcessing(X_test)
+    new_X_test = X_test
 
     return X_train, X_test, y_train, y_test, new_X_test
