@@ -25,10 +25,10 @@ myModel = KerasClassifier(build_fn=create_model, epochs=100)
 
 
 def load_VAE(dataset_name):
-    vae = load_model('models/' + dataset_name + '_vae_model.h5', compile=False)
-    enc = load_model('models/' + dataset_name + '_enc_model.h5', compile=False)
-    gen = load_model('models/' + dataset_name + '_gen_model.h5', compile=False)
-    stepper = load_model('models/' + dataset_name + '_stepper_model.h5', compile=False)
+    vae = load_model('BASELINE_models/' + dataset_name + '_vae_model_200.h5', compile=False)
+    enc = load_model('BASELINE_models/' + dataset_name + '_enc_model_200.h5', compile=False)
+    gen = load_model('BASELINE_models/' + dataset_name + '_gen_model_200.h5', compile=False)
+    stepper = load_model('BASELINE_models/' + dataset_name + '_stepper_model_200.h5', compile=False)
     vae.summary()
     return vae, enc, gen, stepper
 
@@ -342,7 +342,7 @@ if __name__ == "__main__":
         pickled_vectorizer_filename = None
 
     # For how many sentences we want to run X-SPELLS
-    no_of_sentences = 3
+    no_of_sentences = 10
     latent_dim = 500
     nbr_features = latent_dim
 

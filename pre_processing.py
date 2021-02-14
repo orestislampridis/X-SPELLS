@@ -5,6 +5,7 @@ Handles the pre-processing used across various other scripts
 import re
 import string
 
+import nltk
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -66,6 +67,37 @@ def preProcessing(strings):
     return clean_tweet_texts
 
 
+# Return average sentence length and number of total tweets in respective dataset
+def word_count(data_path, dataset):
+    df = pd.read_csv(data_path, encoding='utf-8')
+
+    if dataset == "polarity":
+        X = df['tweet'].values
+        y = df['class'].values
+    elif dataset == "hate":
+        # Removing the offensive comments, keeping only neutral and hatespeech,
+        # and convert the class value from 2 to 1 for simplification purposes
+        df = df[df['class'] != 1]
+        X = df['tweet'].values
+        y = df['class'].apply(lambda x: 1 if x == 2 else 0).values
+
+    wordcounts = list()
+    for sentence in X:
+        # with nltk tokenize
+        nltk_tokens = nltk.word_tokenize(sentence)
+        # naive way, splitting words by spaces
+        naive_words = sentence.split(' ')
+        print(nltk_tokens)
+        print(naive_words)
+        wordcounts.append(len(nltk_tokens))
+
+    print('\n')
+    average_wordcount = sum(wordcounts) / len(wordcounts)
+    no_tweets = len(wordcounts)
+
+    return no_tweets, average_wordcount
+
+
 def get_text_data(data_path, dataset):
     df = pd.read_csv(data_path, encoding='utf-8')
 
@@ -84,3 +116,13 @@ def get_text_data(data_path, dataset):
     new_X_test = X_test
 
     return X_train, X_test, y_train, y_test, new_X_test
+
+
+if __name__ == "__main__":
+    # Count dataset statistics
+    dataset_name = "hate"
+    no_tweets, avg_no_words = word_count("data/" + dataset_name + "_tweets.csv", dataset_name)
+
+    print('dataset: ', dataset_name)
+    print('no. tweets: ', no_tweets)
+    print('avg no. words: ', avg_no_words)

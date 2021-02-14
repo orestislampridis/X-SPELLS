@@ -84,13 +84,13 @@ model = "RF"
 max_nbr_exemplars = 5  # Should not be longer than the max exemplars used for training x-spells
 
 # Load saved exemplars and counter-exemplars for demonstration
-with open('data/' + dataset + '_' + model + '_' + 'exemplars', 'rb') as f:
+with open('../data/' + dataset + '_' + model + '_' + 'exemplars', 'rb') as f:
     loaded_exemplars = pickle.load(f)
 
-with open('data/' + dataset + '_' + model + '_' + 'counter_exemplars', 'rb') as f:
+with open('../data/' + dataset + '_' + model + '_' + 'counter_exemplars', 'rb') as f:
     loaded_counter_exemplars = pickle.load(f)
 
-X_train, X_test, y_train, y_test, _ = get_text_data('data/' + dataset + '_tweets.csv', dataset)
+X_train, X_test, y_train, y_test, _ = get_text_data('../data/' + dataset + '_tweets.csv', dataset)
 
 # Iterate from 1 to 5 exemplars, inclusive
 for no_exemplars in range(1, max_nbr_exemplars + 1):
@@ -107,8 +107,7 @@ for no_exemplars in range(1, max_nbr_exemplars + 1):
         knn_synthetic_prediction = knn_predict_on_synthetic_sentences(X_test[j], no_exemplars, y_test[j], exemplars,
                                                                       counter_exemplars)
         # Train the knn classifier by using real sentences from the train set
-        knn_real_sentences_prediction = knn_predict_on_real_sentences(X_test[j], no_exemplars, X_train.tolist(),
-                                                                      y_train.tolist())
+        knn_real_sentences_prediction = knn_predict_on_real_sentences(X_test[j], no_exemplars, X_train, y_train)
 
         knnpreds.append(knn_synthetic_prediction)
         knn_real_sentences_preds.append(knn_real_sentences_prediction)
