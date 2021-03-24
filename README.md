@@ -9,6 +9,15 @@ Keras implementation of VAE based on code in [alexeyev's repo](https://github.co
 
 An improved version of X-SPELLS is available [here](https://github.com/lstate/X-SPELLS-V2).
 
-## References
+## License
+
+MIT License for the Keras implementation of VAE code in the lstm_vae directory.
+Apache-2.0 License for the rest of the project.
+
+## Citation
 
 O. Lampridis, R. Guidotti, S. Ruggieri. [Explaining Sentiment Classification with Synthetic Exemplars and Counter-Exemplars](https://doi.org/10.1007/978-3-030-61527-7_24). Discovery Science (DS 2020). 357-373. Vol. 12323 of LNCS, Springer, September 2020. <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Open_Access_logo_PLoS_transparent.svg/220px-Open_Access_logo_PLoS_transparent.svg.png" alt="Excel Sheet" width="10"/> 
+
+## References
+
+Bowman, S.R., Vilnis, L., Vinyals, O., Dai, A.M., Jozefowicz, R. and Bengio, S., 2015. Generating sentences from a continuous space. arXiv preprint arXiv:1511.06349.
