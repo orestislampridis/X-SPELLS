@@ -11,7 +11,7 @@ An improved version of X-SPELLS is available [here](https://github.com/lstate/X-
 
 ## License
 
-MIT License for the Keras implementation of VAE code in the lstm_vae directory. <br />
+MIT License for the Keras implementation of VAE code located in the lstm_vae directory. <br />
 Apache-2.0 License for the rest of the project.
 
 ## Citation
